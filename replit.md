@@ -1,51 +1,51 @@
 # Email Automation Web App
 
 ## Overview
-A production-ready email automation web application for sending bulk emails with resume PDF attachments via Gmail SMTP. Built with Express + React (TypeScript) on the Replit fullstack template.
+A production-ready email automation web application for sending bulk emails with resume PDF attachments via Gmail SMTP. Built with Express + React (TypeScript). Restructured for Vercel deployment.
 
 ## Key Features
 - Bulk email management (paste comma/line/semicolon separated)
-- Resume PDF upload and attachment
+- Resume PDF upload and attachment (base64 in-memory)
 - Gmail SMTP configuration (email + app password)
-- Background email sending with threading (non-blocking)
+- One-at-a-time email sending via serverless API (no timeouts)
 - Real-time progress tracking (sent/failed/remaining)
 - Stop sending capability
-- Error logging to file
-- Persistent email storage (JSON file)
+- Persistent email storage (localStorage in browser)
+- Vercel-ready with serverless function
 
 ## Architecture
 - **Frontend**: React + TypeScript + Tailwind CSS + shadcn/ui components
-- **Backend**: Express.js with nodemailer for SMTP, multer for file uploads
-- **Storage**: JSON file (`data/emails.json`) for email list persistence
-- **Uploads**: PDF files stored in `uploads/` directory
-- **Logs**: Failed emails logged to `data/failed_emails.log`
+- **Backend (dev)**: Express.js with nodemailer (same API as Vercel function)
+- **Backend (Vercel)**: Serverless function at `/api/send-email`
+- **Storage**: Browser localStorage for email list (no server-side storage needed)
+- **Resume**: Loaded as base64 in browser memory, sent with each API call
 
 ## Project Structure
 ```
-client/src/pages/dashboard.tsx  - Main dashboard with all UI sections
-server/routes.ts                - All API endpoints
-server/storage.ts               - File-based storage layer
+client/src/pages/dashboard.tsx  - Main dashboard with all UI (client-side state)
+server/routes.ts                - Express route for local dev (mirrors Vercel function)
+api/send-email.ts               - Vercel serverless function for sending one email
 shared/schema.ts                - Shared TypeScript types and Zod schemas
-data/                           - Persistent data (emails.json, logs)
-uploads/                        - Uploaded resume PDFs
+vercel.json                     - Vercel deployment configuration
 ```
 
-## API Endpoints
-- `GET /api/emails` - List all emails
-- `POST /api/emails` - Add bulk emails (body: `{ emails: "raw text" }`)
-- `DELETE /api/emails` - Clear all emails
-- `DELETE /api/emails/:email` - Remove single email
-- `GET /api/resume` - Get resume info
-- `POST /api/resume` - Upload resume PDF (multipart/form-data)
-- `DELETE /api/resume` - Delete resume
-- `GET /api/progress` - Get sending progress (polled every 1s)
-- `POST /api/send` - Start sending (body: SMTP config)
-- `POST /api/stop` - Stop sending
+## API Endpoint
+- `POST /api/send-email` - Send a single email
+  - Body: `{ senderEmail, appPassword, senderName, subject, emailBody, recipientEmail, recipientName, resumeBase64?, resumeFilename? }`
+  - Returns: `{ success: boolean, email: string, error?: string }`
 
 ## Email Sending Logic
-- Background thread (async, non-blocking)
-- 3-5 second random delay between emails
+- Frontend loops through emails one at a time
+- Each email calls `/api/send-email` serverless function
+- 3-5 second random delay between emails (client-side)
 - Name extraction from email local part
 - Dynamic greeting (Hi {name} or Hello)
 - Gmail SMTP with TLS (smtp.gmail.com:587)
-- Stop flag for graceful cancellation
+- Stop flag for graceful cancellation (client-side ref)
+
+## Vercel Deployment
+1. Push code to GitHub
+2. Import in Vercel
+3. Build command: `npx vite build`
+4. Output directory: `dist/public`
+5. Serverless function auto-detected from `/api/` directory

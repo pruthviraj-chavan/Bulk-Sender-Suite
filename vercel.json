@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npx vite build",
+  "outputDirectory": "dist/public",
+  "framework": "vite",
+  "functions": {
+    "api/*.ts": {
+      "maxDuration": 30
+    }
+  }
+}
