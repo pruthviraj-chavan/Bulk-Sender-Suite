@@ -7,13 +7,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import {
   Mail,
   Upload,
   Send,
   Trash2,
   FileText,
-  Settings,
   CheckCircle2,
   XCircle,
   Clock,
@@ -24,6 +24,17 @@ import {
   Paperclip,
   Eye,
   EyeOff,
+  Zap,
+  ShieldCheck,
+  Globe,
+  ArrowRight,
+  UserCircle,
+  AtSign,
+  Lock,
+  MessageSquare,
+  BarChart3,
+  Target,
+  X,
 } from "lucide-react";
 
 interface EmailEntry {
@@ -86,6 +97,36 @@ function saveEmails(emails: EmailEntry[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(emails));
 }
 
+function StatCard({ icon: Icon, label, value, color, delay }: {
+  icon: typeof Mail;
+  label: string;
+  value: number;
+  color: string;
+  delay: string;
+}) {
+  const colorMap: Record<string, string> = {
+    indigo: "from-indigo-500 to-indigo-600 dark:from-indigo-600 dark:to-indigo-700",
+    emerald: "from-emerald-500 to-emerald-600 dark:from-emerald-600 dark:to-emerald-700",
+    rose: "from-rose-500 to-rose-600 dark:from-rose-600 dark:to-rose-700",
+    amber: "from-amber-500 to-amber-600 dark:from-amber-600 dark:to-amber-700",
+  };
+  return (
+    <div className={`animate-fade-in-up ${delay}`}>
+      <div className={`rounded-md p-4 text-white bg-gradient-to-br ${colorMap[color]}`}>
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-2xl font-bold tracking-tight">{value}</p>
+            <p className="text-xs font-medium opacity-80 mt-0.5">{label}</p>
+          </div>
+          <div className="rounded-md p-2 bg-white/15">
+            <Icon className="h-5 w-5" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { toast } = useToast();
 
@@ -111,6 +152,7 @@ export default function Dashboard() {
   });
   const stopRef = useRef(false);
   const [addingEmails, setAddingEmails] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
     saveEmails(emails);
@@ -151,9 +193,7 @@ export default function Dashboard() {
     toast({ title: "Emails cleared", description: "All emails have been removed." });
   }, [toast]);
 
-  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const processFile = useCallback((file: File) => {
     if (file.type !== "application/pdf") {
       toast({ title: "Invalid file", description: "Only PDF files are accepted.", variant: "destructive" });
       return;
@@ -169,8 +209,21 @@ export default function Dashboard() {
       toast({ title: "Resume uploaded", description: "Your PDF has been loaded." });
     };
     reader.readAsDataURL(file);
-    e.target.value = "";
   }, [toast]);
+
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processFile(file);
+    e.target.value = "";
+  }, [processFile]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
+  }, [processFile]);
 
   const startSending = useCallback(async () => {
     const pendingEmails = emails.filter(e => e.status !== "sent");
@@ -276,359 +329,486 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-md bg-primary flex items-center justify-center">
-              <Mail className="h-5 w-5 text-primary-foreground" />
+      <header className="relative border-b sticky top-0 z-50 bg-gradient-to-r from-indigo-600 via-purple-600 to-fuchsia-600 dark:from-indigo-700 dark:via-purple-700 dark:to-fuchsia-700">
+        <div className="absolute inset-0 animate-gradient opacity-20 bg-gradient-to-r from-white/10 via-transparent to-white/10" />
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3 animate-slide-in-right">
+              <div className="h-10 w-10 rounded-md flex items-center justify-center bg-white/20 dark:bg-white/15 backdrop-blur-sm">
+                <Zap className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight" data-testid="text-header-title">Email Automation</h1>
+                <p className="text-xs text-white/70 hidden sm:block">Bulk email sender with smart delivery</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-lg font-semibold leading-tight">Email Automation</h1>
-              <p className="text-xs text-muted-foreground">Bulk email sender with resume attachment</p>
+            <div className="flex items-center gap-3 animate-fade-in">
+              {progress.isRunning && (
+                <Button variant="outline" onClick={stopSending} data-testid="button-stop-sending" className="border-white/30 text-white bg-white/10">
+                  <StopCircle /> Stop
+                </Button>
+              )}
+              <Button
+                data-testid="button-send-all"
+                onClick={startSending}
+                disabled={!canSend}
+                size="lg"
+                className="bg-white text-indigo-700 dark:bg-white dark:text-indigo-700 font-semibold"
+              >
+                {progress.isRunning ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <Send />
+                )}
+                <span className="hidden sm:inline">Send All Emails</span>
+                <span className="sm:hidden">Send</span>
+                {pendingCount > 0 && (
+                  <Badge variant="secondary" className="ml-1 no-default-hover-elevate bg-indigo-100 text-indigo-700 dark:bg-indigo-100 dark:text-indigo-700">{pendingCount}</Badge>
+                )}
+              </Button>
             </div>
           </div>
-          <Button
-            data-testid="button-send-all"
-            onClick={startSending}
-            disabled={!canSend}
-            size="lg"
-          >
-            {progress.isRunning ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <Send />
-            )}
-            Send All Emails
-            {pendingCount > 0 && (
-              <Badge variant="secondary" className="ml-1 no-default-hover-elevate">{pendingCount}</Badge>
-            )}
-          </Button>
+
+          <div className="flex items-center gap-4 mt-3 flex-wrap">
+            <div className="flex items-center gap-1.5 text-white/70 text-xs">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              <span>Gmail SMTP</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-white/70 text-xs">
+              <Globe className="h-3.5 w-3.5" />
+              <span>TLS Encrypted</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-white/70 text-xs">
+              <Zap className="h-3.5 w-3.5" />
+              <span>Rate Limited</span>
+            </div>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {(progress.isRunning || progress.total > 0) && (
-          <Card>
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <Send className="text-muted-foreground" />
-                  <CardTitle className="text-lg">Sending Progress</CardTitle>
-                </div>
-                {progress.isRunning && (
-                  <Button variant="destructive" size="sm" onClick={stopSending} data-testid="button-stop-sending">
-                    <StopCircle /> Stop
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Progress value={progressPercent} className="h-3" data-testid="progress-bar" />
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="text-center p-3 bg-muted/50 rounded-md">
-                  <p className="text-2xl font-bold" data-testid="text-total-count">{progress.total}</p>
-                  <p className="text-xs text-muted-foreground">Total</p>
-                </div>
-                <div className="text-center p-3 bg-muted/50 rounded-md">
-                  <p className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-sent-count">{progress.sent}</p>
-                  <p className="text-xs text-muted-foreground">Sent</p>
-                </div>
-                <div className="text-center p-3 bg-muted/50 rounded-md">
-                  <p className="text-2xl font-bold text-red-600 dark:text-red-400" data-testid="text-failed-count">{progress.failed}</p>
-                  <p className="text-xs text-muted-foreground">Failed</p>
-                </div>
-                <div className="text-center p-3 bg-muted/50 rounded-md">
-                  <p className="text-2xl font-bold" data-testid="text-remaining-count">{progress.remaining}</p>
-                  <p className="text-xs text-muted-foreground">Remaining</p>
-                </div>
-              </div>
-              {progress.isRunning && progress.currentEmail && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-md px-3 py-2">
-                  <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-                  <span className="truncate" data-testid="text-current-email">Sending to {progress.currentEmail}...</span>
-                </div>
-              )}
-              {isComplete && (
-                <div className="flex items-center gap-2 text-sm font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30 rounded-md px-3 py-2">
-                  <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  <span data-testid="text-complete-message">All emails processed! {progress.sent} sent, {progress.failed} failed.</span>
-                </div>
-              )}
-              {progress.errors.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-destructive flex items-center gap-1">
-                    <AlertCircle className="h-4 w-4" /> Errors ({progress.errors.length})
-                  </p>
-                  <div className="max-h-[150px] overflow-y-auto border rounded-md">
-                    {progress.errors.map((err, i) => (
-                      <div key={i} className="flex items-start gap-2 px-3 py-2 text-xs border-b last:border-b-0" data-testid={`row-error-${i}`}>
-                        <XCircle className="h-3.5 w-3.5 text-destructive shrink-0 mt-0.5" />
-                        <div className="min-w-0">
-                          <span className="font-mono">{err.email}</span>
-                          <span className="text-muted-foreground ml-1">— {err.error}</span>
-                        </div>
+          <div className="animate-fade-in-up">
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-md p-1.5 bg-indigo-100 dark:bg-indigo-900/40">
+                      <BarChart3 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <CardTitle className="text-base">Sending Progress</CardTitle>
+                    {progress.isRunning && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500" />
+                        </span>
+                        <span className="text-xs text-muted-foreground">Live</span>
                       </div>
-                    ))}
+                    )}
                   </div>
+                  <span className="text-sm font-semibold text-muted-foreground">{progressPercent}%</span>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="relative">
+                  <Progress value={progressPercent} className="h-2.5" data-testid="progress-bar" />
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <StatCard icon={Target} label="Total" value={progress.total} color="indigo" delay="stagger-1" />
+                  <StatCard icon={CheckCircle2} label="Sent" value={progress.sent} color="emerald" delay="stagger-2" />
+                  <StatCard icon={XCircle} label="Failed" value={progress.failed} color="rose" delay="stagger-3" />
+                  <StatCard icon={Clock} label="Remaining" value={progress.remaining} color="amber" delay="stagger-4" />
+                </div>
+
+                {progress.isRunning && progress.currentEmail && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2.5 animate-fade-in">
+                    <Loader2 className="h-4 w-4 animate-spin shrink-0 text-indigo-500" />
+                    <span className="truncate" data-testid="text-current-email">Sending to <span className="font-mono font-medium text-foreground">{progress.currentEmail}</span></span>
+                  </div>
+                )}
+                {isComplete && (
+                  <div className="flex items-center gap-2 text-sm font-medium rounded-md px-3 py-2.5 animate-fade-in bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    <span data-testid="text-complete-message">All emails processed! {progress.sent} sent, {progress.failed} failed.</span>
+                  </div>
+                )}
+                {progress.errors.length > 0 && (
+                  <div className="space-y-2 animate-fade-in">
+                    <p className="text-sm font-medium text-destructive flex items-center gap-1.5">
+                      <AlertCircle className="h-4 w-4" /> Errors ({progress.errors.length})
+                    </p>
+                    <div className="max-h-[150px] overflow-y-auto border rounded-md">
+                      {progress.errors.map((err, i) => (
+                        <div key={i} className="flex items-start gap-2 px-3 py-2 text-xs border-b last:border-b-0" data-testid={`row-error-${i}`}>
+                          <XCircle className="h-3.5 w-3.5 text-destructive shrink-0 mt-0.5" />
+                          <div className="min-w-0">
+                            <span className="font-mono font-medium">{err.email}</span>
+                            <span className="text-muted-foreground ml-1">-- {err.error}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <Users className="text-muted-foreground" />
-                    <CardTitle className="text-lg">Email Recipients</CardTitle>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="outline" data-testid="badge-total-count">
-                      <Mail className="mr-1 h-3 w-3" /> {emails.length} total
-                    </Badge>
-                    {sentCount > 0 && (
-                      <Badge variant="secondary" data-testid="badge-sent-count">
-                        <CheckCircle2 className="mr-1 h-3 w-3 text-green-600 dark:text-green-400" /> {sentCount} sent
+          <div className="lg:col-span-2 space-y-6">
+            <div className="animate-fade-in-up stagger-1">
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <div className="rounded-md p-1.5 bg-indigo-100 dark:bg-indigo-900/40">
+                        <Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                      </div>
+                      <CardTitle className="text-base">Email Recipients</CardTitle>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline" data-testid="badge-total-count">
+                        <Mail className="mr-1 h-3 w-3" /> {emails.length} total
                       </Badge>
-                    )}
-                    {failedCount > 0 && (
-                      <Badge variant="destructive" data-testid="badge-failed-count">
-                        <XCircle className="mr-1 h-3 w-3" /> {failedCount} failed
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                <CardDescription>Paste emails separated by commas, semicolons, or new lines</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Textarea
-                    data-testid="input-bulk-emails"
-                    placeholder={"john@example.com\njane.doe@company.com\nhr@startup.io"}
-                    value={bulkText}
-                    onChange={(e) => setBulkText(e.target.value)}
-                    className="min-h-[100px] font-mono text-sm"
-                  />
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Button data-testid="button-add-emails" onClick={addEmails} disabled={!bulkText.trim() || addingEmails}>
-                      {addingEmails ? <Loader2 className="animate-spin" /> : <Mail />}
-                      Add Emails
-                    </Button>
-                    {emails.length > 0 && (
-                      <Button data-testid="button-clear-emails" variant="outline" onClick={clearEmails}>
-                        <Trash2 /> Clear All
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                {emails.length > 0 && (
-                  <div className="border rounded-md overflow-hidden">
-                    <div className="max-h-[280px] overflow-y-auto">
-                      <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm z-10">
-                          <tr>
-                            <th className="text-left px-3 py-2 font-medium text-muted-foreground">Email</th>
-                            <th className="text-left px-3 py-2 font-medium text-muted-foreground">Name</th>
-                            <th className="text-center px-3 py-2 font-medium text-muted-foreground">Status</th>
-                            <th className="w-10"></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {emails.map((entry, i) => (
-                            <tr key={entry.email} className="border-t" data-testid={`row-email-${i}`}>
-                              <td className="px-3 py-2 font-mono text-xs truncate max-w-[200px]">{entry.email}</td>
-                              <td className="px-3 py-2 text-muted-foreground text-xs">{entry.name || "—"}</td>
-                              <td className="px-3 py-2 text-center">
-                                {entry.status === "pending" && (
-                                  <Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>
-                                )}
-                                {entry.status === "sent" && (
-                                  <Badge variant="secondary" className="text-xs"><CheckCircle2 className="mr-1 h-3 w-3 text-green-600 dark:text-green-400" /> Sent</Badge>
-                                )}
-                                {entry.status === "failed" && (
-                                  <Badge variant="destructive" className="text-xs"><XCircle className="mr-1 h-3 w-3" /> Failed</Badge>
-                                )}
-                              </td>
-                              <td className="px-1 py-2">
-                                <Button size="icon" variant="ghost" onClick={() => removeEmail(entry.email)} data-testid={`button-remove-email-${i}`}>
-                                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                                </Button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      {sentCount > 0 && (
+                        <Badge variant="secondary" data-testid="badge-sent-count" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
+                          <CheckCircle2 className="mr-1 h-3 w-3" /> {sentCount} sent
+                        </Badge>
+                      )}
+                      {failedCount > 0 && (
+                        <Badge variant="destructive" data-testid="badge-failed-count">
+                          <XCircle className="mr-1 h-3 w-3" /> {failedCount} failed
+                        </Badge>
+                      )}
                     </div>
                   </div>
-                )}
-
-                {emails.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                    <Mail className="h-10 w-10 mb-2 opacity-40" />
-                    <p className="text-sm">No emails added yet</p>
-                    <p className="text-xs">Paste a list above to get started</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div>
-            <Card>
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-2">
-                  <Paperclip className="text-muted-foreground" />
-                  <CardTitle className="text-lg">Resume Attachment</CardTitle>
-                </div>
-                <CardDescription>Upload a PDF to attach to every email</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {!resume && (
-                  <label
-                    htmlFor="resume-upload"
-                    className="flex flex-col items-center justify-center border-2 border-dashed rounded-md py-8 cursor-pointer transition-colors"
-                    data-testid="label-upload-area"
-                  >
-                    <Upload className="h-8 w-8 mb-2 text-muted-foreground" />
-                    <p className="text-sm font-medium">Click to upload PDF</p>
-                    <p className="text-xs text-muted-foreground mt-1">Max 10MB</p>
-                    <input
-                      id="resume-upload"
-                      type="file"
-                      accept=".pdf,application/pdf"
-                      className="hidden"
-                      onChange={handleFileUpload}
-                      data-testid="input-resume-file"
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <Textarea
+                      data-testid="input-bulk-emails"
+                      placeholder={"john@example.com\njane.doe@company.com\nhr@startup.io"}
+                      value={bulkText}
+                      onChange={(e) => setBulkText(e.target.value)}
+                      className="min-h-[100px] font-mono text-sm"
                     />
-                  </label>
-                )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Button data-testid="button-add-emails" onClick={addEmails} disabled={!bulkText.trim() || addingEmails}>
+                        {addingEmails ? <Loader2 className="animate-spin" /> : <Mail />}
+                        Add Emails
+                      </Button>
+                      {emails.length > 0 && (
+                        <Button data-testid="button-clear-emails" variant="outline" onClick={clearEmails}>
+                          <Trash2 /> Clear All
+                        </Button>
+                      )}
+                    </div>
+                  </div>
 
-                {resume && (
-                  <div className="flex items-center justify-between gap-2 p-3 bg-muted/50 rounded-md">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <FileText className="h-8 w-8 text-primary shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate" data-testid="text-resume-name">{resume.name}</p>
-                        <p className="text-xs text-muted-foreground">{formatSize(resume.size)}</p>
+                  {emails.length > 0 && (
+                    <div className="border rounded-md">
+                      <div className="max-h-[320px] overflow-y-auto">
+                        <table className="w-full text-sm">
+                          <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm z-10">
+                            <tr>
+                              <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs uppercase tracking-wider">Email</th>
+                              <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs uppercase tracking-wider hidden sm:table-cell">Name</th>
+                              <th className="text-center px-3 py-2.5 font-medium text-muted-foreground text-xs uppercase tracking-wider">Status</th>
+                              <th className="w-10"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {emails.map((entry, i) => (
+                              <tr key={entry.email} className="border-t transition-colors" data-testid={`row-email-${i}`}>
+                                <td className="px-3 py-2.5">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="h-7 w-7 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center shrink-0">
+                                      <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">{(entry.name || entry.email)[0].toUpperCase()}</span>
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="font-mono text-xs truncate">{entry.email}</p>
+                                      <p className="text-xs text-muted-foreground sm:hidden">{entry.name || "--"}</p>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">{entry.name || "--"}</td>
+                                <td className="px-3 py-2.5 text-center">
+                                  {entry.status === "pending" && (
+                                    <Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>
+                                  )}
+                                  {entry.status === "sent" && (
+                                    <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"><CheckCircle2 className="mr-1 h-3 w-3" /> Sent</Badge>
+                                  )}
+                                  {entry.status === "failed" && (
+                                    <Badge variant="destructive" className="text-xs"><XCircle className="mr-1 h-3 w-3" /> Failed</Badge>
+                                  )}
+                                </td>
+                                <td className="px-1 py-2.5">
+                                  <Button size="icon" variant="ghost" onClick={() => removeEmail(entry.email)} data-testid={`button-remove-email-${i}`}>
+                                    <X className="h-3.5 w-3.5 text-muted-foreground" />
+                                  </Button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
-                    <Button size="icon" variant="ghost" onClick={() => setResume(null)} data-testid="button-remove-resume">
-                      <Trash2 className="h-4 w-4 text-muted-foreground" />
-                    </Button>
+                  )}
+
+                  {emails.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+                      <div className="h-14 w-14 rounded-full bg-muted/80 flex items-center justify-center mb-3">
+                        <Mail className="h-7 w-7 opacity-40" />
+                      </div>
+                      <p className="text-sm font-medium">No emails added yet</p>
+                      <p className="text-xs mt-1">Paste a list of email addresses above to get started</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="animate-fade-in-up stagger-3">
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-md p-1.5 bg-indigo-100 dark:bg-indigo-900/40">
+                      <MessageSquare className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">SMTP Settings</CardTitle>
+                      <CardDescription className="text-xs mt-0.5">Configure your Gmail credentials and email content</CardDescription>
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="sender-email" className="flex items-center gap-1.5 text-xs">
+                        <AtSign className="h-3 w-3 text-muted-foreground" /> Gmail Address
+                      </Label>
+                      <Input
+                        id="sender-email"
+                        data-testid="input-sender-email"
+                        type="email"
+                        placeholder="you@gmail.com"
+                        value={smtpConfig.senderEmail}
+                        onChange={(e) => setSmtpConfig({ ...smtpConfig, senderEmail: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="app-password" className="flex items-center gap-1.5 text-xs">
+                        <Lock className="h-3 w-3 text-muted-foreground" /> App Password
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="app-password"
+                          data-testid="input-app-password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="xxxx xxxx xxxx xxxx"
+                          value={smtpConfig.appPassword}
+                          onChange={(e) => setSmtpConfig({ ...smtpConfig, appPassword: e.target.value })}
+                          className="pr-10"
+                        />
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="absolute right-0 top-0"
+                          onClick={() => setShowPassword(!showPassword)}
+                          data-testid="button-toggle-password"
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="sender-name" className="flex items-center gap-1.5 text-xs">
+                        <UserCircle className="h-3 w-3 text-muted-foreground" /> Your Name (optional)
+                      </Label>
+                      <Input
+                        id="sender-name"
+                        data-testid="input-sender-name"
+                        placeholder="John Doe"
+                        value={smtpConfig.senderName}
+                        onChange={(e) => setSmtpConfig({ ...smtpConfig, senderName: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="subject" className="flex items-center gap-1.5 text-xs">
+                        <Mail className="h-3 w-3 text-muted-foreground" /> Subject Line
+                      </Label>
+                      <Input
+                        id="subject"
+                        data-testid="input-subject"
+                        placeholder="Application for Software Engineer"
+                        value={smtpConfig.subject}
+                        onChange={(e) => setSmtpConfig({ ...smtpConfig, subject: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="email-body" className="flex items-center gap-1.5 text-xs">
+                      <MessageSquare className="h-3 w-3 text-muted-foreground" />
+                      Email Body
+                      <span className="text-muted-foreground ml-1">( Use {"{{name}}"} for recipient name )</span>
+                    </Label>
+                    <Textarea
+                      id="email-body"
+                      data-testid="input-email-body"
+                      placeholder={"Dear {{name}},\n\nI am writing to express my interest in...\n\nBest regards,\nYour Name"}
+                      value={smtpConfig.emailBody}
+                      onChange={(e) => setSmtpConfig({ ...smtpConfig, emailBody: e.target.value })}
+                      className="min-h-[140px] font-mono text-sm"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="animate-fade-in-up stagger-2">
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-md p-1.5 bg-indigo-100 dark:bg-indigo-900/40">
+                      <Paperclip className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Resume</CardTitle>
+                      <CardDescription className="text-xs mt-0.5">PDF attachment for every email</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {!resume && (
+                    <label
+                      htmlFor="resume-upload"
+                      className={`flex flex-col items-center justify-center border-2 border-dashed rounded-md py-8 cursor-pointer transition-all ${
+                        dragOver ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30" : "border-border"
+                      }`}
+                      data-testid="label-upload-area"
+                      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                      onDragLeave={() => setDragOver(false)}
+                      onDrop={handleDrop}
+                    >
+                      <div className="h-12 w-12 rounded-full bg-muted/80 flex items-center justify-center mb-3">
+                        <Upload className={`h-5 w-5 transition-colors ${dragOver ? "text-indigo-500" : "text-muted-foreground"}`} />
+                      </div>
+                      <p className="text-sm font-medium">
+                        {dragOver ? "Drop your PDF here" : "Click or drag to upload"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">PDF only, max 10MB</p>
+                      <input
+                        id="resume-upload"
+                        type="file"
+                        accept=".pdf,application/pdf"
+                        className="hidden"
+                        onChange={handleFileUpload}
+                        data-testid="input-resume-file"
+                      />
+                    </label>
+                  )}
+
+                  {resume && (
+                    <div className="flex items-center justify-between gap-2 p-3 bg-indigo-50 dark:bg-indigo-950/20 rounded-md border border-indigo-200 dark:border-indigo-800/40 animate-fade-in">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-10 w-10 rounded-md bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center shrink-0">
+                          <FileText className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate" data-testid="text-resume-name">{resume.name}</p>
+                          <p className="text-xs text-muted-foreground">{formatSize(resume.size)}</p>
+                        </div>
+                      </div>
+                      <Button size="icon" variant="ghost" onClick={() => setResume(null)} data-testid="button-remove-resume">
+                        <X className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {!canSend && !progress.isRunning && emails.length > 0 && (
+              <div className="animate-fade-in-up stagger-3">
+                <Card>
+                  <CardContent className="py-4">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-md p-1.5 bg-amber-100 dark:bg-amber-900/30 shrink-0 mt-0.5">
+                        <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                      </div>
+                      <div className="text-sm space-y-2">
+                        <p className="font-medium text-sm">Before sending:</p>
+                        <ul className="space-y-1.5 text-xs text-muted-foreground">
+                          {pendingCount === 0 && (
+                            <li className="flex items-center gap-1.5">
+                              <ArrowRight className="h-3 w-3 shrink-0" /> At least one pending email
+                            </li>
+                          )}
+                          {!smtpConfig.senderEmail && (
+                            <li className="flex items-center gap-1.5">
+                              <ArrowRight className="h-3 w-3 shrink-0" /> Gmail address
+                            </li>
+                          )}
+                          {!smtpConfig.appPassword && (
+                            <li className="flex items-center gap-1.5">
+                              <ArrowRight className="h-3 w-3 shrink-0" /> Gmail App Password
+                            </li>
+                          )}
+                          {!smtpConfig.subject && (
+                            <li className="flex items-center gap-1.5">
+                              <ArrowRight className="h-3 w-3 shrink-0" /> Subject line
+                            </li>
+                          )}
+                          {!smtpConfig.emailBody && (
+                            <li className="flex items-center gap-1.5">
+                              <ArrowRight className="h-3 w-3 shrink-0" /> Email body content
+                            </li>
+                          )}
+                        </ul>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            <div className="animate-fade-in-up stagger-4">
+              <Card>
+                <CardContent className="py-4">
+                  <div className="space-y-3">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Quick Tips</p>
+                    <div className="space-y-2.5">
+                      <div className="flex items-start gap-2">
+                        <ShieldCheck className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400 mt-0.5 shrink-0" />
+                        <p className="text-xs text-muted-foreground">Use a Gmail <span className="font-medium text-foreground">App Password</span>, not your regular password</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Clock className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400 mt-0.5 shrink-0" />
+                        <p className="text-xs text-muted-foreground">3-5 second delay between emails to avoid rate limits</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Globe className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400 mt-0.5 shrink-0" />
+                        <p className="text-xs text-muted-foreground">{"{{name}}"} auto-extracts the recipient's name from their email</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
-
-        <Card>
-          <CardHeader className="pb-4">
-            <div className="flex items-center gap-2">
-              <Settings className="text-muted-foreground" />
-              <CardTitle className="text-lg">SMTP Settings</CardTitle>
-            </div>
-            <CardDescription>Configure your Gmail credentials and email content</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="sender-email">Gmail Address</Label>
-                <Input
-                  id="sender-email"
-                  data-testid="input-sender-email"
-                  type="email"
-                  placeholder="you@gmail.com"
-                  value={smtpConfig.senderEmail}
-                  onChange={(e) => setSmtpConfig({ ...smtpConfig, senderEmail: e.target.value })}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="app-password">App Password</Label>
-                <div className="relative">
-                  <Input
-                    id="app-password"
-                    data-testid="input-app-password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="xxxx xxxx xxxx xxxx"
-                    value={smtpConfig.appPassword}
-                    onChange={(e) => setSmtpConfig({ ...smtpConfig, appPassword: e.target.value })}
-                    className="pr-10"
-                  />
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="absolute right-0 top-0"
-                    onClick={() => setShowPassword(!showPassword)}
-                    data-testid="button-toggle-password"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="sender-name">Your Name (optional)</Label>
-                <Input
-                  id="sender-name"
-                  data-testid="input-sender-name"
-                  placeholder="John Doe"
-                  value={smtpConfig.senderName}
-                  onChange={(e) => setSmtpConfig({ ...smtpConfig, senderName: e.target.value })}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="subject">Subject Line</Label>
-                <Input
-                  id="subject"
-                  data-testid="input-subject"
-                  placeholder="Application for Software Engineer"
-                  value={smtpConfig.subject}
-                  onChange={(e) => setSmtpConfig({ ...smtpConfig, subject: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="email-body">
-                Email Body <span className="text-xs text-muted-foreground ml-1">( Use {"{{name}}"} for recipient name )</span>
-              </Label>
-              <Textarea
-                id="email-body"
-                data-testid="input-email-body"
-                placeholder={"Dear {{name}},\n\nI am writing to express my interest in...\n\nBest regards,\nYour Name"}
-                value={smtpConfig.emailBody}
-                onChange={(e) => setSmtpConfig({ ...smtpConfig, emailBody: e.target.value })}
-                className="min-h-[140px] font-mono text-sm"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {!canSend && !progress.isRunning && emails.length > 0 && (
-          <Card className="border-dashed">
-            <CardContent className="py-4">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-                <div className="text-sm text-muted-foreground space-y-1">
-                  <p className="font-medium">Before sending, make sure you have:</p>
-                  <ul className="list-disc pl-4 space-y-0.5 text-xs">
-                    {pendingCount === 0 && <li>At least one pending email in the list</li>}
-                    {!smtpConfig.senderEmail && <li>Your Gmail address configured</li>}
-                    {!smtpConfig.appPassword && <li>Your Gmail App Password entered</li>}
-                    {!smtpConfig.subject && <li>A subject line for your emails</li>}
-                    {!smtpConfig.emailBody && <li>The email body content</li>}
-                  </ul>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </main>
     </div>
   );
