@@ -1,18 +1,54 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+export const emailEntrySchema = z.object({
+  email: z.string().email(),
+  name: z.string().optional(),
+  status: z.enum(["pending", "sent", "failed"]).default("pending"),
+  error: z.string().optional(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export type EmailEntry = z.infer<typeof emailEntrySchema>;
+
+export const smtpConfigSchema = z.object({
+  senderEmail: z.string().email("Valid Gmail address required"),
+  appPassword: z.string().min(1, "App password is required"),
+  senderName: z.string().optional(),
+  subject: z.string().min(1, "Subject line is required"),
+  emailBody: z.string().min(1, "Email body is required"),
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type SmtpConfig = z.infer<typeof smtpConfigSchema>;
+
+export const addEmailsSchema = z.object({
+  emails: z.string().min(1, "At least one email is required"),
+});
+
+export type AddEmailsInput = z.infer<typeof addEmailsSchema>;
+
+export const sendingProgressSchema = z.object({
+  total: z.number(),
+  sent: z.number(),
+  failed: z.number(),
+  remaining: z.number(),
+  currentEmail: z.string().optional(),
+  isRunning: z.boolean(),
+  errors: z.array(z.object({
+    email: z.string(),
+    error: z.string(),
+  })),
+});
+
+export type SendingProgress = z.infer<typeof sendingProgressSchema>;
+
+export interface ResumeInfo {
+  filename: string;
+  originalName: string;
+  size: number;
+  uploadedAt: string;
+}
+
+export interface DashboardState {
+  emails: EmailEntry[];
+  resume: ResumeInfo | null;
+  progress: SendingProgress;
+}
