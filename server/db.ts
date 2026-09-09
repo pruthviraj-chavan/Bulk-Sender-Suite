@@ -1,10 +1,10 @@
-import pg from "pg";
-
-const { Pool } = pg;
+import { Pool } from "pg";
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+  connectionTimeoutMillis: 5000,
+  idleTimeoutMillis: 10000,
 });
 
 const DEFAULT_USERNAME = "pruthvirajchavan2002@gmail.com";
@@ -17,6 +17,10 @@ const DEFAULT_PASSWORD_HASH =
   "scrypt:BWULiKNq0yjwK-oV_kv8wQ:7bqI-V4CSQWB02TWZEJOL1fgc67ghwTlq9kdQUU4QXoUP-Q_82r3M8lADrt0MQm2QGFEmK-s4Zkm9tr8kMMoTQ";
 
 export async function initializeAppData() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is not configured");
+  }
+
   await pool.query(
     `INSERT INTO app_users (username, password_hash, display_name)
      VALUES ($1, $2, $3)
