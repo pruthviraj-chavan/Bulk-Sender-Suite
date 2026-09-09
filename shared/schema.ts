@@ -1,4 +1,21 @@
 import { z } from "zod";
+import { integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+
+export const appUsers = pgTable("app_users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  displayName: text("display_name").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const appSettings = pgTable("app_settings", {
+  id: integer("id").primaryKey().default(1),
+  senderEmail: text("sender_email").notNull(),
+  senderName: text("sender_name").notNull(),
+  appPasswordEncrypted: text("app_password_encrypted"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
 
 export const emailEntrySchema = z.object({
   email: z.string().email(),

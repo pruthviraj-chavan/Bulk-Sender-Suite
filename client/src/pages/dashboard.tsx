@@ -35,6 +35,7 @@ import {
   BarChart3,
   Target,
   X,
+  LogOut,
 } from "lucide-react";
 
 interface EmailEntry {
@@ -134,9 +135,9 @@ export default function Dashboard() {
   const [bulkText, setBulkText] = useState("");
   const [resume, setResume] = useState<ResumeFile | null>(null);
   const [smtpConfig, setSmtpConfig] = useState<SmtpConfig>({
-    senderEmail: "",
+    senderEmail: "pruthviraj9404@gmail.com",
     appPassword: "",
-    senderName: "",
+    senderName: "Pruthviraj Chavan",
     subject: "",
     emailBody: "",
   });
@@ -153,10 +154,64 @@ export default function Dashboard() {
   const stopRef = useRef(false);
   const [addingEmails, setAddingEmails] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [hasSavedAppPassword, setHasSavedAppPassword] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  const logout = useCallback(async () => {
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "include",
+    });
+    window.location.reload();
+  }, []);
 
   useEffect(() => {
     saveEmails(emails);
   }, [emails]);
+
+  useEffect(() => {
+    fetch("/api/settings", { credentials: "include" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((settings) => {
+        if (!settings) return;
+        setHasSavedAppPassword(settings.hasAppPassword);
+        setSmtpConfig((current) => ({
+          ...current,
+          senderEmail: settings.senderEmail,
+          senderName: settings.senderName,
+        }));
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const saveSettings = useCallback(async () => {
+    setSavingSettings(true);
+    try {
+      const response = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          senderEmail: smtpConfig.senderEmail,
+          senderName: smtpConfig.senderName,
+          appPassword: smtpConfig.appPassword,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Could not save settings");
+      setHasSavedAppPassword(true);
+      setSmtpConfig((current) => ({ ...current, appPassword: "" }));
+      toast({ title: "Settings saved", description: "Your Gmail app password is encrypted and stored securely." });
+    } catch (error) {
+      toast({
+        title: "Could not save settings",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingSettings(false);
+    }
+  }, [smtpConfig.appPassword, smtpConfig.senderEmail, smtpConfig.senderName, toast]);
 
   const addEmails = useCallback(() => {
     if (!bulkText.trim()) return;
@@ -258,7 +313,6 @@ export default function Dashboard() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             senderEmail: smtpConfig.senderEmail,
-            appPassword: smtpConfig.appPassword,
             senderName: smtpConfig.senderName,
             subject: smtpConfig.subject,
             emailBody: smtpConfig.emailBody,
@@ -310,7 +364,7 @@ export default function Dashboard() {
   const canSend =
     pendingCount > 0 &&
     smtpConfig.senderEmail &&
-    smtpConfig.appPassword &&
+    hasSavedAppPassword &&
     smtpConfig.subject &&
     smtpConfig.emailBody &&
     !progress.isRunning;
@@ -365,6 +419,15 @@ export default function Dashboard() {
                 {pendingCount > 0 && (
                   <Badge variant="secondary" className="ml-1 no-default-hover-elevate bg-indigo-100 text-indigo-700 dark:bg-indigo-100 dark:text-indigo-700">{pendingCount}</Badge>
                 )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={logout}
+                className="border-white/30 text-white bg-white/10"
+                data-testid="button-logout"
+              >
+                <LogOut />
+                <span className="hidden sm:inline">Log out</span>
               </Button>
             </div>
           </div>
@@ -609,7 +672,7 @@ export default function Dashboard() {
                           id="app-password"
                           data-testid="input-app-password"
                           type={showPassword ? "text" : "password"}
-                          placeholder="xxxx xxxx xxxx xxxx"
+                           placeholder={hasSavedAppPassword ? "Saved securely — enter a new one to replace it" : "xxxx xxxx xxxx xxxx"}
                           value={smtpConfig.appPassword}
                           onChange={(e) => setSmtpConfig({ ...smtpConfig, appPassword: e.target.value })}
                           className="pr-10"
@@ -625,6 +688,9 @@ export default function Dashboard() {
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
                       </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        {hasSavedAppPassword ? "A saved app password is active. Leave blank to keep it." : "Save it once; it will be encrypted in the database."}
+                      </p>
                     </div>
                   </div>
 
@@ -670,6 +736,16 @@ export default function Dashboard() {
                       onChange={(e) => setSmtpConfig({ ...smtpConfig, emailBody: e.target.value })}
                       className="min-h-[140px] font-mono text-sm"
                     />
+                  </div>
+                  <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-3">
+                    <div className="text-xs text-muted-foreground">
+                      <p className="font-medium text-foreground">Gmail settings</p>
+                      <p>{hasSavedAppPassword ? "App password saved securely" : "App password not saved yet"}</p>
+                    </div>
+                    <Button type="button" variant="outline" onClick={saveSettings} disabled={savingSettings || !smtpConfig.senderEmail || !smtpConfig.senderName || (!hasSavedAppPassword && !smtpConfig.appPassword)}>
+                      {savingSettings ? <Loader2 className="animate-spin" /> : <Lock />}
+                      {hasSavedAppPassword ? "Update saved settings" : "Save settings"}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -761,7 +837,7 @@ export default function Dashboard() {
                               <ArrowRight className="h-3 w-3 shrink-0" /> Gmail address
                             </li>
                           )}
-                          {!smtpConfig.appPassword && (
+                          {!hasSavedAppPassword && (
                             <li className="flex items-center gap-1.5">
                               <ArrowRight className="h-3 w-3 shrink-0" /> Gmail App Password
                             </li>

@@ -5,6 +5,28 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
+import Login from "@/pages/login";
+import { useEffect, useState } from "react";
+
+function AuthenticatedApp() {
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me", { credentials: "include" })
+      .then((response) => setAuthenticated(response.ok))
+      .catch(() => setAuthenticated(false));
+  }, []);
+
+  if (authenticated === null) {
+    return <div className="min-h-screen bg-background" />;
+  }
+
+  if (!authenticated) {
+    return <Login onLogin={() => setAuthenticated(true)} />;
+  }
+
+  return <Router />;
+}
 
 function Router() {
   return (
@@ -20,7 +42,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Router />
+        <AuthenticatedApp />
       </TooltipProvider>
     </QueryClientProvider>
   );

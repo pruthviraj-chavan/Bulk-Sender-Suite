@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import session from "express-session";
 
 const app = express();
 const httpServer = createServer(app);
@@ -21,6 +22,25 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+if (!process.env.SESSION_SECRET) {
+  throw new Error("SESSION_SECRET must be configured before starting the server");
+}
+
+app.set("trust proxy", 1);
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 8 * 60 * 60 * 1000,
+    },
+  }),
+);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -60,6 +80,8 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  const { initializeAppData } = await import("./db");
+  await initializeAppData();
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
