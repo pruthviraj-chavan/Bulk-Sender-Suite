@@ -1,15 +1,19 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import nodemailer from "nodemailer";
+import { getAuthUser } from "../server/auth-cookie";
+import { getAppSettings, initializeAppData } from "../server/db";
+import { decryptAppPassword } from "../server/security";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
+  if (!getAuthUser(req)) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
   const {
-    senderEmail,
-    appPassword,
-    senderName,
     subject,
     emailBody,
     recipientEmail,
@@ -18,17 +22,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     resumeFilename,
   } = req.body;
 
-  if (!senderEmail || !appPassword || !subject || !emailBody || !recipientEmail) {
+  if (!subject || !emailBody || !recipientEmail) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
   try {
+    await initializeAppData();
+    const settings = await getAppSettings();
+    if (!settings?.app_password_encrypted) {
+      return res.status(400).json({ message: "Save your Gmail app password in settings first" });
+    }
+    const appPassword = decryptAppPassword(settings.app_password_encrypted);
+
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
       port: 587,
       secure: false,
       auth: {
-        user: senderEmail,
+        user: settings.sender_email,
         pass: appPassword,
       },
       tls: {
@@ -43,9 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? bodyWithName
       : `${greeting},\n\n${bodyWithName}`;
 
-    const fromField = senderName
-      ? `"${senderName}" <${senderEmail}>`
-      : senderEmail;
+    const fromField = `"${settings.sender_name}" <${settings.sender_email}>`;
 
     const attachments: any[] = [];
     if (resumeBase64 && resumeFilename) {

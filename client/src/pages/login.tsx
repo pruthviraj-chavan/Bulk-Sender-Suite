@@ -23,7 +23,13 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
         credentials: "include",
         body: JSON.stringify({ username, password }),
       });
-      const data = await response.json();
+      const responseText = await response.text();
+      let data: { message?: string } = {};
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        data = {};
+      }
       if (!response.ok) throw new Error(data.message || "Login failed");
       onLogin();
     } catch (loginError) {
