@@ -35,7 +35,6 @@ import {
   BarChart3,
   Target,
   X,
-  LogOut,
 } from "lucide-react";
 
 interface EmailEntry {
@@ -156,14 +155,6 @@ export default function Dashboard() {
   const [dragOver, setDragOver] = useState(false);
   const [hasSavedAppPassword, setHasSavedAppPassword] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
-
-  const logout = useCallback(async () => {
-    await fetch("/api/auth/logout", {
-      method: "POST",
-      credentials: "include",
-    });
-    window.location.reload();
-  }, []);
 
   useEffect(() => {
     saveEmails(emails);
@@ -419,15 +410,6 @@ export default function Dashboard() {
                 {pendingCount > 0 && (
                   <Badge variant="secondary" className="ml-1 no-default-hover-elevate bg-indigo-100 text-indigo-700 dark:bg-indigo-100 dark:text-indigo-700">{pendingCount}</Badge>
                 )}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={logout}
-                className="border-white/30 text-white bg-white/10"
-                data-testid="button-logout"
-              >
-                <LogOut />
-                <span className="hidden sm:inline">Log out</span>
               </Button>
             </div>
           </div>

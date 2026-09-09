@@ -70,7 +70,7 @@ export async function registerRoutes(
     });
   });
 
-  app.get("/api/settings", requireAuth, async (_req, res) => {
+  app.get("/api/settings", async (_req, res) => {
     const settings = await getAppSettings();
     if (!settings) return res.status(404).json({ message: "Settings not found" });
     return res.json({
@@ -80,7 +80,7 @@ export async function registerRoutes(
     });
   });
 
-  app.put("/api/settings", requireAuth, async (req, res) => {
+  app.put("/api/settings", async (req, res) => {
     const senderEmail = typeof req.body?.senderEmail === "string" ? req.body.senderEmail.trim().toLowerCase() : "";
     const senderName = typeof req.body?.senderName === "string" ? req.body.senderName.trim() : "";
     const appPassword = typeof req.body?.appPassword === "string" ? req.body.appPassword.replace(/\s+/g, "") : "";
@@ -102,7 +102,7 @@ export async function registerRoutes(
     return res.json({ senderEmail, senderName, hasAppPassword: true });
   });
 
-  app.post("/api/send-email", requireAuth, async (req, res) => {
+  app.post("/api/send-email", async (req, res) => {
     const {
       subject,
       emailBody,

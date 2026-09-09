@@ -1,12 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getAuthUser } from "../server/auth-cookie";
 import { getAppSettings, initializeAppData, saveAppSettings } from "../server/db";
 import { encryptAppPassword } from "../server/security";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const user = getAuthUser(req);
-  if (!user) return res.status(401).json({ message: "Authentication required" });
-
   try {
     await initializeAppData();
     const settings = await getAppSettings();

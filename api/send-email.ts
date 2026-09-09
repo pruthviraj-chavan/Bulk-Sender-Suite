@@ -1,16 +1,11 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import nodemailer from "nodemailer";
-import { getAuthUser } from "../server/auth-cookie";
 import { getAppSettings, initializeAppData } from "../server/db";
 import { decryptAppPassword } from "../server/security";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
-  }
-
-  if (!getAuthUser(req)) {
-    return res.status(401).json({ message: "Authentication required" });
   }
 
   const {
