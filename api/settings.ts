@@ -1,6 +1,4 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getAppSettings, initializeAppData, saveAppSettings } from "../server/db";
-import { encryptAppPassword } from "../server/security";
 
 function getRequestBody(req: VercelRequest): Record<string, unknown> {
   if (req.body && typeof req.body === "object" && !Array.isArray(req.body)) {
@@ -23,6 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(405).json({ message: "Method not allowed" });
     }
 
+    const { getAppSettings, initializeAppData, saveAppSettings } = await import("../server/db");
     await initializeAppData();
     const settings = await getAppSettings();
     if (!settings) return res.status(404).json({ message: "Settings not found" });
@@ -45,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const appPasswordEncrypted = appPassword
-      ? encryptAppPassword(appPassword)
+      ? (await import("../server/security")).encryptAppPassword(appPassword)
       : settings.app_password_encrypted ?? undefined;
 
     if (!appPasswordEncrypted) {
@@ -59,6 +58,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (error instanceof SyntaxError) {
       return res.status(400).json({ message: "Request body must be valid JSON" });
     }
-    return res.status(500).json({ message: "Settings service is not configured correctly" });
+    return res.status(500).json({
+      message: error instanceof Error
+        ? error.message
+        : "Settings service is not configured correctly",
+    });
   }
 }

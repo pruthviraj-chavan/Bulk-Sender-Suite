@@ -1,7 +1,4 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import nodemailer from "nodemailer";
-import { getAppSettings, initializeAppData } from "../server/db";
-import { decryptAppPassword } from "../server/security";
 
 function getRequestBody(req: VercelRequest): Record<string, unknown> {
   if (req.body && typeof req.body === "object" && !Array.isArray(req.body)) {
@@ -35,6 +32,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!subject || !emailBody || !recipientEmail) {
       return res.status(400).json({ message: "Subject, email body, and recipient email are required" });
     }
+
+    const [{ default: nodemailer }, { getAppSettings, initializeAppData }, { decryptAppPassword }] =
+      await Promise.all([
+        import("nodemailer"),
+        import("../server/db"),
+        import("../server/security"),
+      ]);
 
     await initializeAppData();
     const settings = await getAppSettings();
@@ -91,9 +95,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ message: "Request body must be valid JSON" });
     }
 
+    const code = typeof err?.code === "string" ? err.code : "";
+    const message =
+      code === "EAUTH" || code === "AUTHENTICATION"
+        ? "Gmail rejected the saved app password. Generate a new Gmail App Password and save it again."
+        : code === "ETIMEDOUT" || code === "ESOCKET"
+          ? "Gmail SMTP timed out. Please try again in a moment."
+          : err?.message || "Failed to send email";
+
     return res.status(500).json({
       success: false,
-      error: err?.message || "Failed to send email",
+      error: message,
     });
   }
 }

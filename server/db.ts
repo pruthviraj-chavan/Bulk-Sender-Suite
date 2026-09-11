@@ -1,7 +1,13 @@
 import { Pool } from "pg";
 
+const databaseUrl =
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  process.env.POSTGRES_PRISMA_URL ||
+  process.env.POSTGRES_URL_NON_POOLING;
+
 export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: databaseUrl,
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
   connectionTimeoutMillis: 5000,
   idleTimeoutMillis: 10000,
@@ -17,9 +23,29 @@ const DEFAULT_PASSWORD_HASH =
   "scrypt:BWULiKNq0yjwK-oV_kv8wQ:7bqI-V4CSQWB02TWZEJOL1fgc67ghwTlq9kdQUU4QXoUP-Q_82r3M8lADrt0MQm2QGFEmK-s4Zkm9tr8kMMoTQ";
 
 export async function initializeAppData() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is not configured");
+  if (!databaseUrl) {
+    throw new Error("A PostgreSQL connection is not configured. Set DATABASE_URL in Vercel.");
   }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS app_users (
+      id SERIAL PRIMARY KEY,
+      username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      id INTEGER PRIMARY KEY DEFAULT 1,
+      sender_email TEXT NOT NULL,
+      sender_name TEXT NOT NULL,
+      app_password_encrypted TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
 
   await pool.query(
     `INSERT INTO app_users (username, password_hash, display_name)
