@@ -127,6 +127,9 @@ export async function registerRoutes(
         host: "smtp.gmail.com",
         port: 587,
         secure: false,
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 20000,
         auth: {
           user: settings.sender_email,
           pass: appPassword,

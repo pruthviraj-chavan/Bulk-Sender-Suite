@@ -3,25 +3,39 @@ import nodemailer from "nodemailer";
 import { getAppSettings, initializeAppData } from "../server/db";
 import { decryptAppPassword } from "../server/security";
 
+function getRequestBody(req: VercelRequest): Record<string, unknown> {
+  if (req.body && typeof req.body === "object" && !Array.isArray(req.body)) {
+    return req.body as Record<string, unknown>;
+  }
+
+  if (typeof req.body === "string" && req.body.trim()) {
+    const parsed: unknown = JSON.parse(req.body);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  }
+
+  return {};
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ message: "Method not allowed" });
-  }
-
-  const {
-    subject,
-    emailBody,
-    recipientEmail,
-    recipientName,
-    resumeBase64,
-    resumeFilename,
-  } = req.body;
-
-  if (!subject || !emailBody || !recipientEmail) {
-    return res.status(400).json({ message: "Missing required fields" });
-  }
-
   try {
+    if (req.method !== "POST") {
+      return res.status(405).json({ message: "Method not allowed" });
+    }
+
+    const body = getRequestBody(req);
+    const subject = typeof body.subject === "string" ? body.subject.trim() : "";
+    const emailBody = typeof body.emailBody === "string" ? body.emailBody.trim() : "";
+    const recipientEmail = typeof body.recipientEmail === "string" ? body.recipientEmail.trim() : "";
+    const recipientName = typeof body.recipientName === "string" ? body.recipientName.trim() : "";
+    const resumeBase64 = typeof body.resumeBase64 === "string" ? body.resumeBase64 : "";
+    const resumeFilename = typeof body.resumeFilename === "string" ? body.resumeFilename : "";
+
+    if (!subject || !emailBody || !recipientEmail) {
+      return res.status(400).json({ message: "Subject, email body, and recipient email are required" });
+    }
+
     await initializeAppData();
     const settings = await getAppSettings();
     if (!settings?.app_password_encrypted) {
@@ -33,6 +47,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       host: "smtp.gmail.com",
       port: 587,
       secure: false,
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 20000,
       auth: {
         user: settings.sender_email,
         pass: appPassword,
@@ -70,10 +87,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({ success: true, email: recipientEmail });
   } catch (err: any) {
+    if (err instanceof SyntaxError) {
+      return res.status(400).json({ message: "Request body must be valid JSON" });
+    }
+
     return res.status(500).json({
       success: false,
-      email: recipientEmail,
-      error: err.message || "Failed to send email",
+      error: err?.message || "Failed to send email",
     });
   }
 }

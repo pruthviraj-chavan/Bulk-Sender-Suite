@@ -83,6 +83,28 @@ function parseEmails(raw: string): string[] {
     .filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
 }
 
+type ApiResponse = Record<string, unknown>;
+
+async function readApiResponse(response: Response): Promise<ApiResponse> {
+  const text = await response.text();
+  if (!text.trim()) return {};
+
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as ApiResponse;
+    }
+    return { message: String(parsed) };
+  } catch {
+    // Vercel can return a plain-text platform error when a function fails
+    // before it reaches our handler. Keep that message usable in the UI.
+    const message = text.replace(/\s+/g, " ").trim();
+    return {
+      message: message || `Request failed with status ${response.status}`,
+    };
+  }
+}
+
 const STORAGE_KEY = "email_automation_list";
 
 function loadEmails(): EmailEntry[] {
@@ -162,14 +184,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetch("/api/settings", { credentials: "include" })
-      .then((response) => response.ok ? response.json() : null)
+      .then(async (response) => response.ok ? readApiResponse(response) : null)
       .then((settings) => {
         if (!settings) return;
-        setHasSavedAppPassword(settings.hasAppPassword);
+        setHasSavedAppPassword(settings.hasAppPassword === true);
         setSmtpConfig((current) => ({
           ...current,
-          senderEmail: settings.senderEmail,
-          senderName: settings.senderName,
+          senderEmail: typeof settings.senderEmail === "string" ? settings.senderEmail : current.senderEmail,
+          senderName: typeof settings.senderName === "string" ? settings.senderName : current.senderName,
         }));
       })
       .catch(() => undefined);
@@ -188,8 +210,14 @@ export default function Dashboard() {
           appPassword: smtpConfig.appPassword,
         }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "Could not save settings");
+      const data = await readApiResponse(response);
+      if (!response.ok) {
+        throw new Error(
+          typeof data.message === "string"
+            ? data.message
+            : `Could not save settings (HTTP ${response.status})`,
+        );
+      }
       setHasSavedAppPassword(true);
       setSmtpConfig((current) => ({ ...current, appPassword: "" }));
       toast({ title: "Settings saved", description: "Your Gmail app password is encrypted and stored securely." });
@@ -314,15 +342,18 @@ export default function Dashboard() {
           }),
         });
 
-        const data = await res.json();
+        const data = await readApiResponse(res);
 
-        if (data.success) {
+        if (res.ok && data.success === true) {
           sent++;
           setEmails(prev => prev.map(e => e.email === entry.email ? { ...e, status: "sent" as const } : e));
           setProgress(p => ({ ...p, sent, remaining: total - i - 1 }));
         } else {
           failed++;
-          const errMsg = data.error || "Unknown error";
+          const errMsg =
+            (typeof data.error === "string" && data.error) ||
+            (typeof data.message === "string" && data.message) ||
+            `Email send failed (HTTP ${res.status})`;
           errors.push({ email: entry.email, error: errMsg });
           setEmails(prev => prev.map(e => e.email === entry.email ? { ...e, status: "failed" as const, error: errMsg } : e));
           setProgress(p => ({ ...p, failed, errors: [...errors] }));

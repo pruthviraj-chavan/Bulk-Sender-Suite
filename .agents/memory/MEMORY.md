@@ -1,0 +1,1 @@
+- [Vercel API error responses](vercel-api-errors.md) — client requests must tolerate plain-text platform failures, while handlers should validate bodies inside their error boundary.
