@@ -15,6 +15,14 @@ function getRequestBody(req: VercelRequest): Record<string, unknown> {
   return {};
 }
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '50mb',
+    },
+  },
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (req.method !== "POST") {
@@ -28,24 +36,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const recipientName = typeof body.recipientName === "string" ? body.recipientName.trim() : "";
     const resumeBase64 = typeof body.resumeBase64 === "string" ? body.resumeBase64 : "";
     const resumeFilename = typeof body.resumeFilename === "string" ? body.resumeFilename : "";
+    const senderEmail = typeof body.senderEmail === "string" ? body.senderEmail.trim() : "";
+    const senderName = typeof body.senderName === "string" ? body.senderName.trim() : "";
+    const appPassword = typeof body.appPassword === "string" ? body.appPassword : "";
 
-    if (!subject || !emailBody || !recipientEmail) {
-      return res.status(400).json({ message: "Subject, email body, and recipient email are required" });
+    if (!subject || !emailBody || !recipientEmail || !senderEmail || !appPassword) {
+      return res.status(400).json({ message: "Missing required fields" });
     }
 
-    const [{ default: nodemailer }, { getAppSettings, initializeAppData }, { decryptAppPassword }] =
-      await Promise.all([
-        import("nodemailer"),
-        import("../server/db"),
-        import("../server/security"),
-      ]);
-
-    await initializeAppData();
-    const settings = await getAppSettings();
-    if (!settings?.app_password_encrypted) {
-      return res.status(400).json({ message: "Save your Gmail app password in settings first" });
-    }
-    const appPassword = decryptAppPassword(settings.app_password_encrypted);
+    const { default: nodemailer } = await import("nodemailer");
 
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
@@ -55,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       greetingTimeout: 10000,
       socketTimeout: 20000,
       auth: {
-        user: settings.sender_email,
+        user: senderEmail,
         pass: appPassword,
       },
       tls: {
@@ -70,7 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? bodyWithName
       : `${greeting},\n\n${bodyWithName}`;
 
-    const fromField = `"${settings.sender_name}" <${settings.sender_email}>`;
+    const fromField = senderName ? `"${senderName}" <${senderEmail}>` : senderEmail;
 
     const attachments: any[] = [];
     if (resumeBase64 && resumeFilename) {
@@ -98,7 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const code = typeof err?.code === "string" ? err.code : "";
     const message =
       code === "EAUTH" || code === "AUTHENTICATION"
-        ? "Gmail rejected the saved app password. Generate a new Gmail App Password and save it again."
+        ? "Gmail rejected the app password. Generate a new Gmail App Password and try again."
         : code === "ETIMEDOUT" || code === "ESOCKET"
           ? "Gmail SMTP timed out. Please try again in a moment."
           : err?.message || "Failed to send email";

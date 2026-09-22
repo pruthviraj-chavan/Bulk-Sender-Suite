@@ -315,7 +315,7 @@ export default function Dashboard() {
       }
 
       if (i < pendingEmails.length - 1 && !stopRef.current) {
-        const delay = 3000 + Math.random() * 2000;
+        const delay = 500 + Math.random() * 500;
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
