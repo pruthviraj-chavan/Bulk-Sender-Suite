@@ -175,62 +175,9 @@ export default function Dashboard() {
   const stopRef = useRef(false);
   const [addingEmails, setAddingEmails] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [hasSavedAppPassword, setHasSavedAppPassword] = useState(false);
-  const [savingSettings, setSavingSettings] = useState(false);
-
   useEffect(() => {
     saveEmails(emails);
   }, [emails]);
-
-  useEffect(() => {
-    fetch("/api/settings", { credentials: "include" })
-      .then(async (response) => response.ok ? readApiResponse(response) : null)
-      .then((settings) => {
-        if (!settings) return;
-        setHasSavedAppPassword(settings.hasAppPassword === true);
-        setSmtpConfig((current) => ({
-          ...current,
-          senderEmail: typeof settings.senderEmail === "string" ? settings.senderEmail : current.senderEmail,
-          senderName: typeof settings.senderName === "string" ? settings.senderName : current.senderName,
-        }));
-      })
-      .catch(() => undefined);
-  }, []);
-
-  const saveSettings = useCallback(async () => {
-    setSavingSettings(true);
-    try {
-      const response = await fetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          senderEmail: smtpConfig.senderEmail,
-          senderName: smtpConfig.senderName,
-          appPassword: smtpConfig.appPassword,
-        }),
-      });
-      const data = await readApiResponse(response);
-      if (!response.ok) {
-        throw new Error(
-          typeof data.message === "string"
-            ? data.message
-            : `Could not save settings (HTTP ${response.status})`,
-        );
-      }
-      setHasSavedAppPassword(true);
-      setSmtpConfig((current) => ({ ...current, appPassword: "" }));
-      toast({ title: "Settings saved", description: "Your Gmail app password is encrypted and stored securely." });
-    } catch (error) {
-      toast({
-        title: "Could not save settings",
-        description: error instanceof Error ? error.message : "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setSavingSettings(false);
-    }
-  }, [smtpConfig.appPassword, smtpConfig.senderEmail, smtpConfig.senderName, toast]);
 
   const addEmails = useCallback(() => {
     if (!bulkText.trim()) return;
@@ -333,6 +280,7 @@ export default function Dashboard() {
           body: JSON.stringify({
             senderEmail: smtpConfig.senderEmail,
             senderName: smtpConfig.senderName,
+            appPassword: smtpConfig.appPassword,
             subject: smtpConfig.subject,
             emailBody: smtpConfig.emailBody,
             recipientEmail: entry.email,
@@ -386,7 +334,7 @@ export default function Dashboard() {
   const canSend =
     pendingCount > 0 &&
     smtpConfig.senderEmail &&
-    hasSavedAppPassword &&
+    smtpConfig.appPassword &&
     smtpConfig.subject &&
     smtpConfig.emailBody &&
     !progress.isRunning;
@@ -685,7 +633,7 @@ export default function Dashboard() {
                           id="app-password"
                           data-testid="input-app-password"
                           type={showPassword ? "text" : "password"}
-                           placeholder={hasSavedAppPassword ? "Saved securely — enter a new one to replace it" : "xxxx xxxx xxxx xxxx"}
+                           placeholder="xxxx xxxx xxxx xxxx"
                           value={smtpConfig.appPassword}
                           onChange={(e) => setSmtpConfig({ ...smtpConfig, appPassword: e.target.value })}
                           className="pr-10"
@@ -702,7 +650,7 @@ export default function Dashboard() {
                         </Button>
                       </div>
                       <p className="text-[11px] text-muted-foreground">
-                        {hasSavedAppPassword ? "A saved app password is active. Leave blank to keep it." : "Save it once; it will be encrypted in the database."}
+                        Provide a 16-character app password to send emails dynamically.
                       </p>
                     </div>
                   </div>
@@ -750,16 +698,7 @@ export default function Dashboard() {
                       className="min-h-[140px] font-mono text-sm"
                     />
                   </div>
-                  <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-3">
-                    <div className="text-xs text-muted-foreground">
-                      <p className="font-medium text-foreground">Gmail settings</p>
-                      <p>{hasSavedAppPassword ? "App password saved securely" : "App password not saved yet"}</p>
-                    </div>
-                    <Button type="button" variant="outline" onClick={saveSettings} disabled={savingSettings || !smtpConfig.senderEmail || !smtpConfig.senderName || (!hasSavedAppPassword && !smtpConfig.appPassword)}>
-                      {savingSettings ? <Loader2 className="animate-spin" /> : <Lock />}
-                      {hasSavedAppPassword ? "Update saved settings" : "Save settings"}
-                    </Button>
-                  </div>
+
                 </CardContent>
               </Card>
             </div>
@@ -850,7 +789,7 @@ export default function Dashboard() {
                               <ArrowRight className="h-3 w-3 shrink-0" /> Gmail address
                             </li>
                           )}
-                          {!hasSavedAppPassword && (
+                          {!smtpConfig.appPassword && (
                             <li className="flex items-center gap-1.5">
                               <ArrowRight className="h-3 w-3 shrink-0" /> Gmail App Password
                             </li>
